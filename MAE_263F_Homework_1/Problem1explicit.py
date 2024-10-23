@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
 ####Code obained from course website and modified
+
 # Helper Function 
 def crossMat(a):
     """
@@ -355,7 +357,7 @@ def getFs(q, EA, deltaL):
     Js[2:6, 2:6] -= hessEnergy
 
     return Fs, Js
-    
+
 EA = 3.1416e+03
 deltaL = 0.05
 xk = 0.0062
@@ -364,32 +366,28 @@ xkp1 = 0.0500
 ykp1 = -0.0661
 gradEnergy = gradEs(xk, yk, xkp1, ykp1, deltaL, EA)
 hessEnergy = hessEs(xk, yk, xkp1, ykp1, deltaL, EA)
-print(gradEnergy)
-print(hessEnergy)
 
-def explicit_update(q_ne, q, u, m, EI, EA, deltaL, dt, W, C):
-
+def explicit_update(q_guess, q, u, m, EI, EA, deltaL, dt, W, C):
+    
+    q_new = q_guess.copy()
     Fb, _ = getFb(q, EI, deltaL) #bending force
     Fs, _ = getFs(q, EA, deltaL) #elastic force
     Fv = -C @ u #viscous force
-    print('u:', u )
-    print(f"Fb: {Fb[3]:.6f} Fs: {Fs[3]:.6f} Fv: {Fv[3]:.6f} W: {W[3]:.6f}")
 
     F_net = Fb + Fs + Fv + W  #sum of forces
-    a = F_net / m #acceleration 
-    #q_new = q + dt * u  #+ (dt**2) * a #update position ???? IS IT .5???
-    #u_new = u + dt * a #update velocity 
+    a = F_net / m #acceleration  
     u_new = u + dt * a
     q_new = q + dt * u_new
 
-    return q_new, u_new
+    return q_new
+
 
 # Inputs (SI units)
 # number of vertices
 nv = 3
 
 # Time step
-dt = 1e-2
+dt = 1e-5
 
 # Rod Length
 RodLength = 0.10
@@ -399,7 +397,7 @@ deltaL = RodLength / (nv - 1)
 
 # Radius of spheres
 R1 = 0.005
-R2 = 0.025
+R2 = 0.005
 R3 = 0.005
 
 # Densities
@@ -415,6 +413,9 @@ Y = 1e9
 
 # Viscosity
 visc = 1000.0
+
+# Maximum number of iterations in Newton Solver
+maximum_iter = 100
 
 # Total simulation time (it exits after t=totalTime)
 totalTime = 10
@@ -476,42 +477,46 @@ u = (q - q0) / dt
 
 # Number of time steps
 Nsteps = round(totalTime / dt)
-print('Nsteps:', Nsteps)
+
 ctime = 0
 
 all_pos = np.zeros(Nsteps)
 all_v = np.zeros(Nsteps)
-
-
-#all_pos = np.zeros((Nsteps, len(q))) # Store positions 
-#all_v = np.zeros((Nsteps, len(q))) # Store velocities 
+midAngle = np.zeros(Nsteps)
 
 
 # Run the simulation
-q_new = q
-u_new = u
 for i in range(Nsteps):
     print(f"q: {q[3]:.6f} u: {u[3]:.6f}")
-    q_new, u_new = explicit_update(q_new, q, u, m, EI, EA, deltaL, dt, W, C)
-    all_pos[i] = q_new[3]  
-    all_v[i] = u_new[3]    
-    q, u = q_new, u_new 
-    ctime += dt  # Increment time  
+    q  = explicit_update(q, q, u, m, EI, EA, deltaL, dt, W, C)
+    u = (q - q0) / dt  # velocity
+    q0 = q
+    all_pos[i] = q[3]  
+    all_v[i] = u[3]    
+    u = (q - q0) / dt  # velocity
+
     
+# Plot
+plt.figure(2)
 t = np.linspace(0, totalTime, Nsteps)
+plt.plot(t, all_pos, color='k')
+plt.xlabel('Time, t [s]')
+plt.ylabel('Displacement, $\\delta$ [m]')
+plt.savefig('fallingBeam.png')
 
-# Plotting displacement and velocity
-plt.figure(figsize=(12, 5))
-# Displacement plots
-plt.subplot(1, 2, 1)
-plt.plot(t, all_pos, color='k')  
-plt.title('Displacement for the Explicit Method')
-plt.xlabel('Time (s)')
-plt.ylabel('Displacement (m)')
+plt.figure(3)
+plt.plot(t, all_v,  color='k')
+plt.xlabel('Time, t [s]')
+plt.ylabel('Velocity, v [m/s]')
+plt.savefig('fallingBeam_velocity.png')
 
-# Velocity plot
-plt.subplot(1, 2, 2)
-plt.plot(t, all_v, color = 'k')  # Plot the first three elements as an example
+plt.figure(4)
+plt.plot(t, midAngle,  color='k')
+plt.xlabel('Time, t [s]')
+plt.ylabel('Angle, $\\alpha$ [deg]')
+plt.savefig('fallingBeam_angle.png')
+
+plt.show()
 plt.title('Velocity for Explicit Method')
 plt.xlabel('Time (s)')
 plt.ylabel('Velocity (m/s)')
