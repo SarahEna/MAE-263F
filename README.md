@@ -1,4 +1,4 @@
-To run each program, use the following command:
+To run each program, navigate to the appropriate folder (cd Homework1) and use the following command:
 `python3 program.py`
 
 ex:
