@@ -419,7 +419,7 @@ nv = 21 # Odd vs even number should show different behavior
 ndof = 2*nv
 
 # Time step
-dt = 0.1
+dt = 10e-2
 
 # Rod Length
 RodLength = 0.10
@@ -549,25 +549,6 @@ for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range s
     vec2 = np.array([q[2*midNode], q[2*midNode+1], 0]) - np.array([q[2*midNode-2], q[2*midNode-1], 0])
     midAngle[timeStep] = np.degrees(np.arctan2(np.linalg.norm(np.cross(vec1, vec2)), np.dot(vec1, vec2)))
 
-#nodes = [20, 25, 30, 35, 40, 45]
-#ter_vel = [-0.004324449609582849, -0.0038532520064677497, -0.0035075151039951243, -0.0032358282016371536, -0.0030169813833036798, -0.0028351718712609202]
-
-
-
-# terminal_velocity
-discr_time =  [0.1, 0.01, 0.005, 0.001]
-terminal_velocity = [-29.21127422316587, -42.13175541576113, -47.07006946766705, -59.575286563177884]
-
-# Plot
-plt.figure(1)
-discr_time =  [0.1, 0.01, 0.005, 0.001]
-terminal_velocity = [-29.21127422316587, -42.13175541576113, -47.07006946766705, -59.575286563177884]
-plt.plot(discr_time, terminal_velocity, color='k')
-plt.xlabel('Time Step, dt')
-plt.ylabel('Terminal Velocity')
-
-
-print('terminal velocity', all_v[50])
 # Plot
 plt.figure(2)
 t = np.linspace(0, totalTime, Nsteps)
