@@ -374,16 +374,30 @@ def getFh(q, q_old, dt, C_t, C_n, hydrodynamic_influence_range, nv): # Get hydro
     Fhydro = np.zeros_like(q)
     Jhydro = np.zeros((len(q), len(q)))
 
-    for k in range(nv-1):  # Loop over nodes, skipping first
+    for k in range(nv):  # Loop over nodes, skipping first
         xk, yk = q[2 * k], q[2 * k + 1] # 2 DOF per node
         vx, vy = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt # Compute velocity
         velocity_k = np.array([vx, vy])
-
-        # Local tangent and normal
-        xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
-        tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
-        tangent /= np.linalg.norm(tangent) # Normalize tangent
-        normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
+        if k == nv - 1:
+            xkm1, ykm1 = q[2 * (k - 1)], q[2 * (k - 1) + 1] # Store prev node
+            tangent = np.array([xk - xkm1, yk - ykm1]) # Compute tangent vector as direction of segnment
+            tangent /= np.linalg.norm(tangent) # Normalize tangent
+            normal = np.array([-tangent[1], tangent[0]])
+        elif k == 0:
+            xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1]  # Store prev node
+            tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
+            tangent /= np.linalg.norm(tangent) # Normalize tangent
+            normal = np.array([-tangent[1], tangent[0]])
+        else:
+            # Local tangent and normal
+            xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
+            xkm1, ykm1 = q[2 * (k - 1)], q[2 * (k - 1) + 1] # Store next node
+            tangentp1 = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
+            tangentp1 /= np.linalg.norm(tangentp1) # Normalize tangent
+            tangentm1 = np.array([xk - xkm1, yk - ykm1]) # Compute tangent vector as direction of segnment
+            tangentm1 /= np.linalg.norm(tangentm1) # Normalize tangent
+            tangent = 1 / 2 * (tangentm1+tangentp1) 
+            normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
 
         # Tangential and normal velocities
         v_tangential = np.dot(velocity_k, tangent) # velocity along tangent
@@ -605,11 +619,11 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
 
 # Inputs and parameters
 SBTFlag = 0
-nv = 40  # Number of vertices
+nv = 100  # Number of vertices
 RodLength = 2
 deltaL = RodLength / (nv-1)
 #ndof = 2 * nv
-dt = 1e-3
+dt = 1e-2
 
 #nv = round(RodLength / deltaL) + 1  # Number of vertices
 ndof = 2 * nv

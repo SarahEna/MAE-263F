@@ -453,7 +453,7 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
     return q_new, flag, hydrodynamic_force_magnitudes, axial_force_magnitudes
 
 # Inputs and parameters
-nv = 16  # Number of vertices
+nv = 50  # Number of vertices
 ndof = 2 * nv
 dt = 1e-2
 RodLength = 2.2

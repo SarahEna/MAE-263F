@@ -374,7 +374,7 @@ def getFh(q, q_old, dt, C_t, C_n, hydrodynamic_influence_range, nv): # Get hydro
     Fhydro = np.zeros_like(q)
     Jhydro = np.zeros((len(q), len(q)))
 
-    for k in range(nv-1):  # Loop over nodes, skipping first
+    for k in range(1, nv-1):  # Loop over nodes, skipping first
         xk, yk = q[2 * k], q[2 * k + 1] # 2 DOF per node
         vx, vy = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt # Compute velocity
         velocity_k = np.array([vx, vy])
@@ -394,50 +394,49 @@ def getFh(q, q_old, dt, C_t, C_n, hydrodynamic_influence_range, nv): # Get hydro
         Fn = -C_n * v_normal * normal # Normal components of drag
 
         # Add local hydrodynamic force
-        Fhydro[2 * k:2 * k + 2] += (Ft + Fn) * deltaL
-        #Fhydro[2 * k:2 * k + 2] -= (C_t-C_n) * (np.dot(tangent, velocity_k) * tangent) + C_n * velocity_k # X and Y at Node K only
+        Fhydro[2 * k:2 * k + 2] += Ft + Fn # X and Y at Node K only
 
-        ## Compute local Jacobian contributions
-        #J_tangential = -C_t * deltaL * np.outer(tangent, tangent) / dt # Spatial gradient of the tangential drag force
-        #J_normal = -C_n * deltaL * np.outer(normal, normal) / dt # Spatial gradient of the normal drag force
-#
-        #Jhydro[2 * k:2 * k + 2, 2 * k:2 * k + 2] += J_tangential + J_normal # Combine components of the Jacobian
-#
-      ## Hydrodynamic interaction forces with nearby segments
-      #for j in range(max(1, k - hydrodynamic_influence_range), min(nv - 1, k + hydrodynamic_influence_range + 1)):
-      #    if j == k:
-      #        continue  # Skip self-interaction
+        # Compute local Jacobian contributions
+        J_tangential = -C_t * np.outer(tangent, tangent) / dt # Spatial gradient of the tangential drag force
+        J_normal = -C_n * np.outer(normal, normal) / dt # Spatial gradient of the normal drag force
 
-      #    xj, yj = q[2 * j], q[2 * j + 1]
-      #    vj_x, vj_y = (q[2 * j] - q_old[2 * j]) / dt, (q[2 * j + 1] - q_old[2 * j + 1]) / dt
-      #    velocity_j = np.array([vj_x, vj_y])
+        Jhydro[2 * k:2 * k + 2, 2 * k:2 * k + 2] += J_tangential + J_normal # Combine components of the Jacobian
 
-      #    # Relative position and velocity
-      #    r = np.array([xj - xk, yj - yk])
-      #    r_norm = np.linalg.norm(r)
-      #    if r_norm == 0:
-      #        continue  # Avoid division by zero
+        # Hydrodynamic interaction forces with nearby segments
+        for j in range(max(1, k - hydrodynamic_influence_range), min(nv - 1, k + hydrodynamic_influence_range + 1)):
+            if j == k:
+                continue  # Skip self-interaction
 
-        #  r_hat = r / r_norm
-        #  v_rel = velocity_j - velocity_k
+            xj, yj = q[2 * j], q[2 * j + 1]
+            vj_x, vj_y = (q[2 * j] - q_old[2 * j]) / dt, (q[2 * j + 1] - q_old[2 * j + 1]) / dt
+            velocity_j = np.array([vj_x, vj_y])
 
-        #  # Interaction forces (decay with distance to approximate hydrodynamic influence)
-        #  interaction_force = (C_n * np.dot(v_rel, r_hat) * r_hat +
-        #                       C_t * (v_rel - np.dot(v_rel, r_hat) * r_hat)) / r_norm
+            # Relative position and velocity
+            r = np.array([xj - xk, yj - yk])
+            r_norm = np.linalg.norm(r)
+            if r_norm == 0:
+                continue  # Avoid division by zero
 
-        #  # Apply interaction force to both segments
-        #  Fhydro[2 * k:2 * k + 2] += interaction_force
-        #  Fhydro[2 * j:2 * j + 2] -= interaction_force
+            r_hat = r / r_norm
+            v_rel = velocity_j - velocity_k
 
-            ## Interaction Jacobian
-            #J_interaction = (C_n * np.outer(r_hat, r_hat) +
-            #                 C_t * (np.eye(2) - np.outer(r_hat, r_hat))) / r_norm
-#
-            ## Update Jacobian
-            #Jhydro[2 * k:2 * k + 2, 2 * j:2 * j + 2] -= J_interaction
-            #Jhydro[2 * j:2 * j + 2, 2 * k:2 * k + 2] -= J_interaction
-            #Jhydro[2 * k:2 * k + 2, 2 * k:2 * k + 2] += J_interaction
-            #Jhydro[2 * j:2 * j + 2, 2 * j:2 * j + 2] += J_interaction
+            # Interaction forces (decay with distance to approximate hydrodynamic influence)
+            interaction_force = (C_n * np.dot(v_rel, r_hat) * r_hat +
+                                 C_t * (v_rel - np.dot(v_rel, r_hat) * r_hat)) / r_norm
+
+            # Apply interaction force to both segments
+            Fhydro[2 * k:2 * k + 2] += interaction_force
+            Fhydro[2 * j:2 * j + 2] -= interaction_force
+
+            # Interaction Jacobian
+            J_interaction = (C_n * np.outer(r_hat, r_hat) +
+                             C_t * (np.eye(2) - np.outer(r_hat, r_hat))) / r_norm
+
+            # Update Jacobian
+            Jhydro[2 * k:2 * k + 2, 2 * j:2 * j + 2] -= J_interaction
+            Jhydro[2 * j:2 * j + 2, 2 * k:2 * k + 2] -= J_interaction
+            Jhydro[2 * k:2 * k + 2, 2 * k:2 * k + 2] += J_interaction
+            Jhydro[2 * j:2 * j + 2, 2 * j:2 * j + 2] += J_interaction
 
     return Fhydro, Jhydro
 
@@ -472,40 +471,15 @@ def getFh_stokeslet(q, q_old, dt, C_t, C_n, nv, mu, deltaL, regularization_epsil
     Fhydro = np.zeros_like(q)
     Jhydro = np.zeros((len(q), len(q)))
 
-
-    for k in range(1,nv-1):
+    for k in range(nv):
         xk, yk = q[2 * k], q[2 * k + 1]
         vx, vy = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt
         velocity_k = np.array([vx, vy])
 
-        # Local tangent and normal
-        xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
-        tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
-        tangent /= np.linalg.norm(tangent) # Normalize tangent
-        normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
-
-        # Tangential and normal velocities
-        v_tangential = np.dot(velocity_k, tangent) # velocity along tangent
-        v_normal = np.dot(velocity_k, normal) # velocity along normal
-
-        # Normal forces
-        Fn = -(4*np.pi*mu) * v_normal * normal # Normal components of drag
-        Fhydro[2 * k:2 * k + 2] += Fn * deltaL / (4*np.pi*mu)
-
-
-        for j in range(1,nv-1):
-## Tasks:
-#
-#   1) A. RFT is working - 
-#      B. Some version of SBT is working under some approx. - state assumption for nodes along centerline (ill-posing makes it difficult)
-#   2) A. Re as a function of time (mean and max) - are we in low Re regime, just acknowledge
-#      B. Comparison between RFT and SBT some type of validation (what we are seeing is what we expect)- qualitative effect of helical interaction
-#      C. GIT - Sarah to create - 
-#
-#
-## Add j == k condition, replace with f_perp term
+        for j in range(nv):
             if j == k:
                 continue
+
             xj, yj = q[2 * j], q[2 * j + 1]
             vj_x, vj_y = (q[2 * j] - q_old[2 * j]) / dt, (q[2 * j + 1] - q_old[2 * j + 1]) / dt
             velocity_j = np.array([vj_x, vj_y])
@@ -514,24 +488,22 @@ def getFh_stokeslet(q, q_old, dt, C_t, C_n, nv, mu, deltaL, regularization_epsil
             r = np.array([xj - xk, yj - yk])
             r_norm = np.linalg.norm(r) + regularization_epsilon
             r_hat = r / r_norm
-## Assume stokeslets along centerline
-# numpy calculation use 2 nodes to start. matrix preconditioning. node j v and r - within every for loop there is a force imposed by the fluid, that is generating a wake that is hitting all the other nodes, n force along n nodes.
 
             # Velocity difference
-            #v_rel = velocity_j - velocity_k
+            v_rel = velocity_j - velocity_k
 
             # Stokeslet interaction forces
             stokeslet_tensor = (np.eye(2) + np.outer(r_hat, r_hat)) / (8 * np.pi * mu * r_norm)
-            interaction_force = np.linalg.solve(stokeslet_tensor, velocity_k) 
+            interaction_force = stokeslet_tensor @ v_rel
 
             # Apply interaction forces
             Fhydro[2 * k:2 * k + 2] += interaction_force
             Fhydro[2 * j:2 * j + 2] -= interaction_force
-#unless we can get Jacobian interaction should ignore
-            # Compute contribution to Jacobian 
-            #interaction_jacobian = -stokeslet_tensor*deltaL / r_norm  # Approximation
-            #Jhydro[2 * k:2 * k + 2, 2 * j:2 * j + 2] += interaction_jacobian
-            #Jhydro[2 * j:2 * j + 2, 2 * k:2 * k + 2] -= interaction_jacobian
+
+            # Compute contribution to Jacobian
+            interaction_jacobian = -stokeslet_tensor*deltaL / r_norm  # Approximation
+            Jhydro[2 * k:2 * k + 2, 2 * j:2 * j + 2] += interaction_jacobian
+            Jhydro[2 * j:2 * j + 2, 2 * k:2 * k + 2] -= interaction_jacobian
 
     return Fhydro, Jhydro
 
@@ -540,18 +512,18 @@ def getFh_stokeslet(q, q_old, dt, C_t, C_n, nv, mu, deltaL, regularization_epsil
 # Add Resistive Force Theory (RFT) to objfun
 # Add hydrodynamic force contribution to objfun
 # Add hydrodynamic force contributions based on SBT to objfun
+# Add hydrodynamic force contributions based on SBT to objfun
 def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
            m, mMat,  # inertia
            EI, EA,   # elastic stiffness 
            deltaL,
-           free_index,
-           RodLength, ro, SBTFlag
+           free_index
            ): # free_index indicates the DOFs that evolve under equations of motion
 
     # Set the drag coefficients for SBT
-##  Replace with values from paper
-    C_n = 4 * np.pi * mu / np.log(RodLength / ro + 1/2)
-    C_t = 2 * np.pi * mu / np.log(RodLength / ro - 1/2)
+
+    C_t = 6*np.pi*mu*0.01
+    C_n = 6*np.pi*mu*deltaL
     q_new = q_guess.copy()
     iter_count = 0
     error = tol * 10
@@ -565,17 +537,29 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
         Fb, Jb = getFb(q_new, EI, deltaL)
         Fs, Js = getFs(q_new, EA, deltaL)
 
-## Need If statement for using RFT vs SBT and to compute SBT using equation 16 from helicoil PNAS paper
-        #Fhydro, Jhydro= getFh(q_new, q_old, dt, C_t, C_n, 0, nv)
-        if SBTFlag == 0:
-            Fhydro, Jhydro= getFh(q_new, q_old, dt, C_t, C_n, 0, nv)
-        elif SBTFlag == 1:
-            Fhydro, Jhydro = getFh_stokeslet(q_new, q_old, dt, C_t, C_n, nv, mu, 1e-5)
-        else:
-            print(f'SBTflag input is invalid, please set to 1 for SBT or 0 for RFT')
+
+        Frft,Jrft = getFh(q_new, q_old, dt, C_t, C_n, 0, nv)
+
+        #Fhydro, Jhydro = getFh_stokeslet(q_new, q_old, dt, C_t, C_n, nv, visc, 1e-5)
+
+        Fhydro = Frft
+        Jhydro = Jrft
 
         # Calculate SBT-based hydrodynamic forces
-        for k in range(nv-1):  # Skip the first and last nodes
+        for k in range(1, nv-1):  # Skip the first and last nodes
+            xk, yk = q_new[2*k], q_new[2*k+1]
+            vx, vy = (q_new[2*k] - q_old[2*k]) / dt, (q_new[2*k+1] - q_old[2*k+1]) / dt
+            velocity_k = np.array([vx, vy])
+
+            # Local tangent and normal
+            xkp1, ykp1 = q_new[2*(k+1)], q_new[2*(k+1)+1]
+            tangent = np.array([xkp1 - xk, ykp1 - yk])
+            tangent /= np.linalg.norm(tangent) # divide by magnitude
+            normal = np.array([-tangent[1], tangent[0]])
+
+            # Tangential and normal velocities
+            v_tangential = np.dot(velocity_k, tangent)
+            v_normal = np.dot(velocity_k, normal)
 
             # Store the magnitude of the hydrodynamic force for color mapping
             hydrodynamic_force_magnitudes[k] = np.linalg.norm(Fhydro[2*k:2*k+2])
@@ -604,22 +588,16 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
     return q_new, flag, hydrodynamic_force_magnitudes, axial_force_magnitudes
 
 # Inputs and parameters
-SBTFlag = 0
-nv = 40  # Number of vertices
-RodLength = 2
-deltaL = RodLength / (nv-1)
-#ndof = 2 * nv
-dt = 1e-3
-
-#nv = round(RodLength / deltaL) + 1  # Number of vertices
+nv = 25  # Number of vertices
 ndof = 2 * nv
-
-#deltaL = RodLength / (nv - 1)
+dt = 2.5e-2
+RodLength = 4
+deltaL = RodLength / (nv - 1)
 all_DOFs = np.arange(ndof)
 free_index = all_DOFs
 
 # Set head motion parameters
-head_amplitude = .2
+head_amplitude = .4
 head_frequency = 2
 
 # Radius of nodes, material properties, etc.
@@ -640,12 +618,12 @@ for g in range(nv):
     R[g] = ro
 
 # Densities
-rho_metal = 1000*(RodLength*np.pi*ro**2) / ((nv-1) * 4/3 * np.pi * ro**3)
+rho_metal = 1000*(RodLength*np.pi*ro**2) / (4/3 * np.pi * ro**3)
 rho_gl = 0.0
 rho = rho_metal - rho_gl
 
 # Young's modulus
-Y = 7e8
+Y = 7e10
 
 # Viscosity
 mu = 1
@@ -655,7 +633,7 @@ visc = mu
 maximum_iter = 100
 
 # Total simulation time (it exits after t=totalTime)
-totalTime = 5
+totalTime = 10
 
 # Utility quantities
 ne = nv - 1
@@ -663,7 +641,7 @@ EI = Y * np.pi * (ro ** 4) / 12
 EA = Y * np.pi * (ro ** 2)
 
 # Tolerance on force function
-tol = EI / RodLength ** 2 * 1e-4
+tol = EI / RodLength ** 2 * 1e-3
 
 # Geometry of the rod
 nodes = np.zeros((nv, 2))
@@ -725,25 +703,17 @@ ax2.set_ylabel('y [m]')
 #ax2.set_xlim(-0.5-RodLength*4, RodLength + 0.5)
 #ax2.set_ylim(-1, 1)
 
-plotStep = 20
+
 # Update function for FuncAnimation
 def update_plot(timeStep):
-    global q, q0, u, ctime, plotStep
+    global q, q0, u, ctime
     print(f't={ctime:.6f}')
 
     # Apply head motion
-    #if ctime < 0.011:
-    #    y_head, vy_head = apply_head_motion(ctime, head_amplitude*0.001, head_frequency)
-    #    q[1] = y_head
-    #    u[1] = vy_head
-    #else:
-    #    y_head, vy_head = apply_head_motion(ctime, head_amplitude, head_frequency)
-    #    q[1] = y_head
-    #    u[1] = vy_head
     y_head, vy_head = apply_head_motion(ctime, head_amplitude, head_frequency)
     q[1] = y_head
     u[1] = vy_head
-#
+
     # Set plot limits based on initial data (adjust as needed)
     ax1.set_xlim(q[0]-0.5, q[-2]+0.5)
     ax1.set_ylim(-1, 1)
@@ -754,8 +724,8 @@ def update_plot(timeStep):
 
     # Solve for new configuration with updated head motion
     q, error, hydrodynamic_force_magnitudes, axial_force_magnitudes = objfun(
-        q, q0, u, dt, tol, maximum_iter, m, mMat, EI, EA, deltaL, free_index, 
-        RodLength, ro, SBTFlag)
+        q, q0, u, dt, tol, maximum_iter, m, mMat, EI, EA, deltaL, free_index
+    )
 
     if error < 0:
         print('Could not converge. Stopping animation.')
@@ -768,49 +738,48 @@ def update_plot(timeStep):
     q0 = q
 
     # Store the head node's x-position
-
     head_x_positions[timeStep] = q[0]
     head_x_velocity[timeStep] = u[0]
+
     # Normalize force magnitudes for color mapping
     normalized_hydro_magnitudes = hydrodynamic_force_magnitudes / np.max(hydrodynamic_force_magnitudes)
     normalized_axial_magnitudes = axial_force_magnitudes / np.max(axial_force_magnitudes)
+
     # Extract x and y positions
     x1 = q[::2]
     x2 = q[1::2]
+
     # Update line to connect scatter points
     line1.set_data(x1, x2)
     line2.set_data(x1, x2)
+
     # Update scatter plots with new data
     sc1.set_offsets(np.c_[x1, x2])
     sc1.set_array(normalized_hydro_magnitudes)
     sc2.set_offsets(np.c_[x1, x2])
     sc2.set_array(normalized_axial_magnitudes)
+
+
     # Update titles with current time
     ax1.set_title(f'Hydrodynamic Force Magnitude at t={ctime:.6f}')
     ax2.set_title(f'Axial Force Magnitude at t={ctime:.6f}')
 
     return sc1, sc2, line1, line2
 
-if SBTFlag == 0:
-    suff = f'RFTv2_RL-{RodLength}_mu-{mu}_N{nv}_dt{dt}'
-elif SBTFlag == 1:
-    suff = f'SBTv2_RL-{RodLength}_mu-{mu}_N{nv}_dt{dt}'
-else:
-    print(f'SBTflag input is set to {SBTFlag} - this is invalid, please set to 1 for SBT or 0 for RFT')
-
+suff = 'RFT_13'
 
 
 # Run animation
-if ctime / dt % plotStep == 0:
-    ani = FuncAnimation(fig, update_plot, frames=round(Nsteps), blit=False, repeat=False)
-    #plt.show()
-    # Save the animation
-    ani.save(f'{nv}nodes_{dt}inc_{head_amplitude}HA_{head_frequency}HF_{3}HIR_{suff}.gif', writer='ffmpeg', fps=30)
-    plt.close()
+
+ani = FuncAnimation(fig, update_plot, frames=Nsteps, blit=False, repeat=False)
+#plt.show()
+# Save the animation
+ani.save(f'{nv}nodes_{dt}inc_{head_amplitude}HA_{head_frequency}HF_{3}HIR_{suff}.gif', writer='ffmpeg', fps=30)
+plt.close()
 
 # Plot results
-head_x_velocity_avg = pd.Series(head_x_velocity).rolling(window=round(totalTime / dt / plotStep)).mean()
-Re = np.abs(head_x_velocity_avg)*RodLength/mu
+head_x_velocity_avg = pd.Series(head_x_velocity).rolling(window=round(totalTime / dt / 20)).mean()
+Re = np.abs(head_x_velocity_avg)*deltaL/mu
 t = np.linspace(0, totalTime, Nsteps)
 
 # New plot for head x-position vs. time
@@ -844,9 +813,6 @@ plt.xlabel('Time, t [s]')
 plt.ylabel('Re')
 plt.title(f'Re of Head Node Over Time ({suff})')
 plt.savefig(f'Re_{suff}.png')
-
-## Add max Re(t) plot
-## Add mean Re(t) plot
 
 plt.show()
 

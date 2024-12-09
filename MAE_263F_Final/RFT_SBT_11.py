@@ -374,16 +374,30 @@ def getFh(q, q_old, dt, C_t, C_n, hydrodynamic_influence_range, nv): # Get hydro
     Fhydro = np.zeros_like(q)
     Jhydro = np.zeros((len(q), len(q)))
 
-    for k in range(nv-1):  # Loop over nodes, skipping first
+    for k in range(nv):  # Loop over nodes, skipping first
         xk, yk = q[2 * k], q[2 * k + 1] # 2 DOF per node
         vx, vy = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt # Compute velocity
         velocity_k = np.array([vx, vy])
-
-        # Local tangent and normal
-        xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
-        tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
-        tangent /= np.linalg.norm(tangent) # Normalize tangent
-        normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
+        if k == nv - 1:
+            xkm1, ykm1 = q[2 * (k - 1)], q[2 * (k - 1) + 1] # Store prev node
+            tangent = np.array([xk - xkm1, yk - ykm1]) # Compute tangent vector as direction of segnment
+            tangent /= np.linalg.norm(tangent) # Normalize tangent
+            normal = np.array([-tangent[1], tangent[0]])
+        elif k == 0:
+            xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1]  # Store prev node
+            tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
+            tangent /= np.linalg.norm(tangent) # Normalize tangent
+            normal = np.array([-tangent[1], tangent[0]])
+        else:
+            # Local tangent and normal
+            xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
+            xkm1, ykm1 = q[2 * (k - 1)], q[2 * (k - 1) + 1] # Store next node
+            tangentp1 = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
+            tangentp1 /= np.linalg.norm(tangentp1) # Normalize tangent
+            tangentm1 = np.array([xk - xkm1, yk - ykm1]) # Compute tangent vector as direction of segnment
+            tangentm1 /= np.linalg.norm(tangentm1) # Normalize tangent
+            tangent = 1 / 2 * (tangentm1+tangentp1) 
+            normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
 
         # Tangential and normal velocities
         v_tangential = np.dot(velocity_k, tangent) # velocity along tangent
@@ -471,29 +485,45 @@ def getFh_stokeslet(q, q_old, dt, C_t, C_n, nv, mu, deltaL, regularization_epsil
     """
     Fhydro = np.zeros_like(q)
     Jhydro = np.zeros((len(q), len(q)))
+    Ahydro = np.zeros((len(q), len(q)))
+    u = (q - q_old) / dt
 
 
-    for k in range(1,nv-1):
-        xk, yk = q[2 * k], q[2 * k + 1]
-        vx, vy = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt
+    for k in range(nv):  # Loop over nodes, skipping first
+        xk, yk = q[2 * k], q[2 * k + 1] # 2 DOF per node
+        vx, vy = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt # Compute velocity
         velocity_k = np.array([vx, vy])
-
-        # Local tangent and normal
-        xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
-        tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
-        tangent /= np.linalg.norm(tangent) # Normalize tangent
-        normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
-
+        #uk[2 * k], uk[2 * k+1] = (q[2 * k] - q_old[2 * k]) / dt, (q[2 * k + 1] - q_old[2 * k + 1]) / dt 
+        if k == nv - 1:
+            xkm1, ykm1 = q[2 * (k - 1)], q[2 * (k - 1) + 1] # Store prev node
+            tangent = np.array([xk - xkm1, yk - ykm1]) # Compute tangent vector as direction of segnment
+            tangent /= np.linalg.norm(tangent) # Normalize tangent
+            normal = np.array([-tangent[1], tangent[0]])
+        elif k == 0:
+            xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1]  # Store prev node
+            tangent = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
+            tangent /= np.linalg.norm(tangent) # Normalize tangent
+            normal = np.array([-tangent[1], tangent[0]])
+        else:
+            # Local tangent and normal
+            xkp1, ykp1 = q[2 * (k + 1)], q[2 * (k + 1) + 1] # Store next node
+            xkm1, ykm1 = q[2 * (k - 1)], q[2 * (k - 1) + 1] # Store next node
+            tangentp1 = np.array([xkp1 - xk, ykp1 - yk]) # Compute tangent vector as direction of segnment
+            tangentp1 /= np.linalg.norm(tangentp1) # Normalize tangent
+            tangentm1 = np.array([xk - xkm1, yk - ykm1]) # Compute tangent vector as direction of segnment
+            tangentm1 /= np.linalg.norm(tangentm1) # Normalize tangent
+            tangent = 1 / 2 * (tangentm1+tangentp1) 
+            normal = np.array([-tangent[1], tangent[0]]) # Compute normal unit vector, y component of tangent is the -x component of normal
         # Tangential and normal velocities
         v_tangential = np.dot(velocity_k, tangent) # velocity along tangent
         v_normal = np.dot(velocity_k, normal) # velocity along normal
 
         # Normal forces
         Fn = -(4*np.pi*mu) * v_normal * normal # Normal components of drag
-        Fhydro[2 * k:2 * k + 2] += Fn * deltaL / (4*np.pi*mu)
+        Fhydro[2 * k:2 * k + 2] += Fn * deltaL
+        Ahydro[2 * k:2 * k + 2, 2 * k:2 * k + 2] = (np.eye(2)-np.outer(tangent,tangent)) / (4*np.pi*mu)
 
-
-        for j in range(1,nv-1):
+        for j in range(nv):
 ## Tasks:
 #
 #   1) A. RFT is working - 
@@ -522,11 +552,13 @@ def getFh_stokeslet(q, q_old, dt, C_t, C_n, nv, mu, deltaL, regularization_epsil
 
             # Stokeslet interaction forces
             stokeslet_tensor = (np.eye(2) + np.outer(r_hat, r_hat)) / (8 * np.pi * mu * r_norm)
-            interaction_force = np.linalg.solve(stokeslet_tensor, velocity_k) 
-
-            # Apply interaction forces
-            Fhydro[2 * k:2 * k + 2] += interaction_force
+            interaction_force = np.linalg.solve(stokeslet_tensor, velocity_j)    
             Fhydro[2 * j:2 * j + 2] -= interaction_force
+            #Ahydro[2 * k:2 * k + 2, 2 * j:2 * j + 2] += stokeslet_tensor
+    
+            
+                    
+
 #unless we can get Jacobian interaction should ignore
             # Compute contribution to Jacobian 
             #interaction_jacobian = -stokeslet_tensor*deltaL / r_norm  # Approximation
@@ -534,6 +566,41 @@ def getFh_stokeslet(q, q_old, dt, C_t, C_n, nv, mu, deltaL, regularization_epsil
             #Jhydro[2 * j:2 * j + 2, 2 * k:2 * k + 2] -= interaction_jacobian
 
     return Fhydro, Jhydro
+
+def RegGreenFunction(r, epsilon):
+    r_norm = np.linalg.norm(r)
+    denom = (r_norm ** 2 + epsilon ** 2) ** (3 / 2)
+    Sij = np.eye(2) * (r_norm ** 2 + 2 * epsilon ** 2) / denom
+    for i in range(2):
+        for j in range(2):
+            Sij[i, j] += r[i] * r[j] / denom
+    return Sij
+
+
+
+
+def getf(q, q_old, dt, mu, deltaL, ro, nv):
+    epsilon = deltaL / 2
+    Fregs = np.zeros_like(q)
+    Sij = np.zeros(2)
+    Sij_bar = np.zeros((len(q), len(q)))
+    velocities = (q - q_old) / dt  # Compute velocities directly [2N]
+    for j in range(nv):
+        xj, yj = q[2 * j], q[2 * j + 1]
+        uj = velocities[2 * j:2 * j + 2]  # Velocity vector of particle j [2N]
+
+        for n in range(nv):
+            xn, yn = q[2 * n], q[2 * n + 1] # [2N]
+            r = np.array([xj - xn, yj - yn]) # [2N]
+            Sij = RegGreenFunction(r, epsilon) # [2 x 2]
+            Sij_bar[2 * j:2 * j + 2, 2 * n:2 * n + 2] = Sij
+            
+            # Solve for force contribution
+    Fregs = -np.linalg.solve(Sij_bar, velocities) * deltaL / (8 * np.pi * mu)
+    #Fregs = f_contribution * deltaL /  8 * np.pi * mu # Accumulate forces
+    return Fregs
+
+
 
 
 
@@ -570,7 +637,9 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
         if SBTFlag == 0:
             Fhydro, Jhydro= getFh(q_new, q_old, dt, C_t, C_n, 0, nv)
         elif SBTFlag == 1:
-            Fhydro, Jhydro = getFh_stokeslet(q_new, q_old, dt, C_t, C_n, nv, mu, 1e-5)
+            #Fhydro, Jhydro = getFh_stokeslet(q_new, q_old, dt, C_t, C_n, nv, mu, deltaL/2)
+            Fhydro = getf(q_new, q_old, dt, mu, deltaL, ro, nv)
+            Jhydro = np.zeros([len(q), len(q)])
         else:
             print(f'SBTflag input is invalid, please set to 1 for SBT or 0 for RFT')
 
@@ -605,11 +674,11 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
 
 # Inputs and parameters
 SBTFlag = 0
-nv = 40  # Number of vertices
-RodLength = 2
+nv = 30  # Number of vertices
+RodLength = 4
 deltaL = RodLength / (nv-1)
 #ndof = 2 * nv
-dt = 1e-3
+dt = 1e-2
 
 #nv = round(RodLength / deltaL) + 1  # Number of vertices
 ndof = 2 * nv
@@ -619,8 +688,8 @@ all_DOFs = np.arange(ndof)
 free_index = all_DOFs
 
 # Set head motion parameters
-head_amplitude = .2
-head_frequency = 2
+head_amplitude = .105
+head_frequency = 5
 
 # Radius of nodes, material properties, etc.
 free_index = all_DOFs
@@ -634,36 +703,41 @@ ro = 1.e-2
 R = np.zeros(nv)  # Vector of size N - Radius of N nodes
 R[:] = ro
 midNode = int((nv + 1) / 2)
+Vtotal = 0
+roavg = 0
 
 for g in range(nv):
-    #R[g] = R[g] - (((g + 1) / nv) ** 2) * 0.05
-    R[g] = ro
+    R[g] = ro * (((nv - 0.19 * g) / nv) ** 9)
+    Vtotal += 4/3 * np.pi * R[g] ** 3
+    roavg += R[g]
+#    #R[g] = ro
+roavg /= nv
 
 # Densities
-rho_metal = 1000*(RodLength*np.pi*ro**2) / ((nv-1) * 4/3 * np.pi * ro**3)
+rho_metal = 1000*(RodLength*np.pi*ro**2) / (Vtotal)
 rho_gl = 0.0
 rho = rho_metal - rho_gl
 
 # Young's modulus
-Y = 7e8
+Y = 7e9
 
 # Viscosity
-mu = 1
+mu = .001
 visc = mu
 
 # Maximum number of iterations in Newton Solver
 maximum_iter = 100
 
 # Total simulation time (it exits after t=totalTime)
-totalTime = 5
+totalTime = 10
 
 # Utility quantities
 ne = nv - 1
 EI = Y * np.pi * (ro ** 4) / 12
-EA = Y * np.pi * (ro ** 2)
+EA = Y * np.pi * (ro ** 2) 
 
 # Tolerance on force function
-tol = EI / RodLength ** 2 * 1e-4
+tol = EI / RodLength ** 2 * 1e-3
 
 # Geometry of the rod
 nodes = np.zeros((nv, 2))
@@ -755,7 +829,7 @@ def update_plot(timeStep):
     # Solve for new configuration with updated head motion
     q, error, hydrodynamic_force_magnitudes, axial_force_magnitudes = objfun(
         q, q0, u, dt, tol, maximum_iter, m, mMat, EI, EA, deltaL, free_index, 
-        RodLength, ro, SBTFlag)
+        RodLength, roavg, SBTFlag)
 
     if error < 0:
         print('Could not converge. Stopping animation.')
@@ -767,8 +841,7 @@ def update_plot(timeStep):
     ctime += dt
     q0 = q
 
-    # Store the head node's x-position
-
+    # Store the head node's x-posi
     head_x_positions[timeStep] = q[0]
     head_x_velocity[timeStep] = u[0]
     # Normalize force magnitudes for color mapping
